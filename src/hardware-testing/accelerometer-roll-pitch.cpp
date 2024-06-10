@@ -14,7 +14,7 @@ void setup() {
 }
 
 void loop() {
-    accelerometer.updateRollPitch();
+    accelerometer.update();
     accX = accelerometer.getAccX();
     accY = accelerometer.getAccY();
     accZ = accelerometer.getAccZ();
@@ -22,15 +22,15 @@ void loop() {
     pitch = accelerometer.getPitch();
 
     Serial.print("Acceleration X: ");
-    Serial.print(accX);
+    Serial.print(accX, 4);
     Serial.println("g");
 
     Serial.print("Acceleration Y: ");
-    Serial.print(accY);
+    Serial.print(accY, 4);
     Serial.println("g");
 
     Serial.print("Acceleration Z: ");
-    Serial.print(accZ);
+    Serial.print(accZ, 4);
     Serial.println("g");
 
     Serial.print("Roll: ");
