@@ -17,7 +17,7 @@ void loop() {
     velZ = accelerometer.getVelZ();
 
     Serial.print("Velocity Z: ");
-    Serial.print(velZ);
+    Serial.print(velZ*100);
     Serial.println("cm/s");
 
     delay(100);

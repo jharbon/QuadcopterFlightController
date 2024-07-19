@@ -22,10 +22,12 @@ const float GRAVITATIONAL_ACC = 9.81;  // m/s^2
 
 void Accelerometer::init() {
     startPowerMode();
+    configSignals();
     prevTimeLogged = std::chrono::steady_clock::now();
     accX = accY = 0.0;
     accZ = 1.0;
     velZ = 0.0;
+    roll = pitch = 0.0;
 }
 
 void Accelerometer::startPowerMode() {
@@ -35,47 +37,6 @@ void Accelerometer::startPowerMode() {
     Wire.write(MPU6050_POWER_MODE);
     Wire.endTransmission();
     delay(250);
-}
-
-void Accelerometer::update() {
-    // Determine how much time has elapsed since this method was last called and update our time log attribute
-    auto nowTime = std::chrono::steady_clock::now();
-    float timeElapsed = std::chrono::duration<float>(nowTime - prevTimeLogged).count();
-    prevTimeLogged = nowTime;
-
-    // First update the Z velocity with the previously measured accelerations 
-    updateVelocity(timeElapsed);
-    // Measure the accelerations and calculate the new roll and pitch angles
-    updateAccs();
-    updateRollPitch();
-}
-
-void Accelerometer::updateAccs() {
-    configSignals();
-    Wire.requestFrom(MPU6050_ADDRESS, 6); // Get data from the 6 registers corresponding to the accelerometer measurements along the x, y and z axes
-    // Read data twice for each of x, y and z since each full measurement along a given axis is spread across two registers
-    // For each measurement shift the first of two bytes 8 bits to the left and add the second byte to the right with | 
-    int16_t lsbX = Wire.read() << 8 | Wire.read();
-    int16_t lsbY = Wire.read() << 8 | Wire.read();
-    int16_t lsbZ = Wire.read() << 8 | Wire.read();
-
-    // Convert from LSB to g and calibrate
-    accX = (float)lsbX/SENSITIVITY_SCALE_FACTOR - ACC_X_CALIBRATION;
-    accY = (float)lsbY/SENSITIVITY_SCALE_FACTOR - ACC_Y_CALIBRATION;
-    accZ = (float)lsbZ/SENSITIVITY_SCALE_FACTOR - ACC_Z_CALIBRATION;
-}
-
-void Accelerometer::updateVelocity(float deltaT) {
-    // Sum the components of the x, y and z accelerations in the 'inertial z' direction which gravity acts along and subtract 1g to account for gravity
-    float inertialAccZ = accX*sin(-pitch*DEG_TO_RAD) + accY*sin(roll*DEG_TO_RAD)*cos(pitch*DEG_TO_RAD) + accZ*cos(roll*DEG_TO_RAD)*cos(pitch*DEG_TO_RAD) - 1;
-    inertialAccZ *= GRAVITATIONAL_ACC*100;  // Convert units: g -> m/s^2 -> cm/s^2
-    velZ += inertialAccZ*deltaT;  // Get the change in vertical velocity in units of cm/s
-}
-
-void Accelerometer::updateRollPitch() {
-    // Calculate roll and pitch angles and also convert from rads to degrees
-    roll = atan(accY / sqrt(pow(accX,2)+pow(accZ,2))) * 180/M_PI;
-    pitch = atan(-accX / sqrt(pow(accY,2)+pow(accZ,2))) * 180/M_PI;
 }
 
 void Accelerometer::configSignals() {
@@ -90,11 +51,56 @@ void Accelerometer::configSignals() {
     Wire.write(ACCELEROMETER_CONFIG_REGISTER); 
     Wire.write(ACCELEROMETER_CONFIG_MODE);  
     Wire.endTransmission();
+}
+
+void Accelerometer::update() {
+    // Determine how much time has elapsed since this method was last called and update our time log attribute
+    auto nowTime = std::chrono::steady_clock::now();
+    float timeElapsed = std::chrono::duration<float>(nowTime - prevTimeLogged).count();
+    prevTimeLogged = nowTime;
 
     // Select the first register we will use for pulling accelerometer measurements from the MPU6050
     Wire.beginTransmission(MPU6050_ADDRESS);
     Wire.write(ACCELEROMETER_MEASUREMENTS_FIRST_REGISTER);
     Wire.endTransmission();
+
+    // First update the Z velocity with the previously measured accelerations 
+    updateVelocity(timeElapsed);
+    // Measure the accelerations and calculate the new roll and pitch angles
+    updateAccs();
+    updateRollPitch();
+}
+
+void Accelerometer::updateAccs() {
+    Wire.requestFrom(MPU6050_ADDRESS, 6); // Get data from the 6 registers corresponding to the accelerometer measurements along the x, y and z axes
+    // Read data twice for each of x, y and z since each full measurement along a given axis is spread across two registers
+    // For each measurement shift the first of two bytes 8 bits to the left and add the second byte to the right with | 
+    int16_t lsbX = Wire.read() << 8 | Wire.read();
+    int16_t lsbY = Wire.read() << 8 | Wire.read();
+    int16_t lsbZ = Wire.read() << 8 | Wire.read();
+
+    // Convert from LSB to g and calibrate
+    accX = (float)lsbX/SENSITIVITY_SCALE_FACTOR - ACC_X_CALIBRATION;
+    accY = (float)lsbY/SENSITIVITY_SCALE_FACTOR - ACC_Y_CALIBRATION;
+    accZ = (float)lsbZ/SENSITIVITY_SCALE_FACTOR - ACC_Z_CALIBRATION;
+}
+
+void Accelerometer::updateVelocity(float deltaT) {
+    float inertialAccZ = calculateInertialAccZ();
+    velZ += inertialAccZ*deltaT;  // Add the change in vertical velocity
+}
+
+float Accelerometer::calculateInertialAccZ() {
+    // Sum the components of the x, y and z accelerations in the 'inertial z' direction which gravity acts along and subtract 1g to account for gravity
+    float inertialAccZ = accX*sin(-pitch*DEG_TO_RAD) + accY*sin(roll*DEG_TO_RAD)*cos(pitch*DEG_TO_RAD) + accZ*cos(roll*DEG_TO_RAD)*cos(pitch*DEG_TO_RAD) - 1;
+    inertialAccZ *= GRAVITATIONAL_ACC;  // Convert units: g -> m/s^2
+    return inertialAccZ;
+}
+
+void Accelerometer::updateRollPitch() {
+    // Calculate roll and pitch angles and also convert from rads to degrees
+    roll = atan(accY / sqrt(pow(accX,2)+pow(accZ,2))) * 180/M_PI;
+    pitch = atan(-accX / sqrt(pow(accY,2)+pow(accZ,2))) * 180/M_PI;
 }
 
 float Accelerometer::getAccX() {

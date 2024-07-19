@@ -7,9 +7,9 @@ class Accelerometer
 {
   private: 
   std::chrono::steady_clock::time_point prevTimeLogged;
-  float accX, accY, accZ;
-  float velZ;
-  float roll, pitch;
+  float accX, accY, accZ;  // g's
+  float velZ;  // m/s
+  float roll, pitch;  // Degrees
 
   void startPowerMode();
   void configSignals();
@@ -21,6 +21,7 @@ class Accelerometer
   Accelerometer() {};
   void init();
   void update();
+  float calculateInertialAccZ();
   float getAccX();
   float getAccY();
   float getAccZ();
